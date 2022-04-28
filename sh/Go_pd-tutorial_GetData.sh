@@ -2,6 +2,8 @@
 ###
 # https://docs.qiime2.org/2022.2/tutorials/pd-mice/
 #
+T0=$(date +%s)
+#
 cwd=$(pwd)
 #
 DATADIR="${cwd}/data"
@@ -39,24 +41,27 @@ wget -O "${DATADIR}/demultiplexed_seqs.zip" \
 #
 ###
 # Importing data into QIIME 2
-qiime tools import \
+(cd $DATADIR; qiime tools import \
 	--type "SampleData[SequencesWithQuality]" \
 	--input-format SingleEndFastqManifestPhred33V2 \
-	--input-path ${DATADIR}/manifest.tsv \
-	--output-path ${DATADIR}/demux_seqs.qza
+	--input-path manifest.tsv \
+	--output-path demux_seqs.qza)
 #
 qiime demux summarize \
 	--i-data ${DATADIR}/demux_seqs.qza \
 	--o-visualization ${DATADIR}/demux_seqs.qzv
 #
+###
 # Sequence quality control and feature table
-qiime dada2 denoise-single \
-	--i-demultiplexed-seqs ${DATADIR}/demux_seqs.qza \
+(cd $DATADIR; qiime dada2 denoise-single \
+	--i-demultiplexed-seqs demux_seqs.qza \
 	--p-trunc-len 150 \
-	--o-table ${DATADIR}/dada2_table.qza \
-	--o-representative-sequences ${DATADIR}/dada2_rep_set.qza \
-	--o-denoising-stats ${DATADIR}/dada2_stats.qza
-#
+	--o-table dada2_table.qza \
+	--o-representative-sequences dada2_rep_set.qza \
+	--o-denoising-stats dada2_stats.qza)
+# Plugin error from dada2: An error was encountered while running DADA2 in R (return code 1), please inspect stdout and stderr to learn more.  Debug info has been saved to /tmp/qiime2-q2cli-err-yd705uhu.log
+# FIX: R -e 'install.packages("png")'
+###
 qiime metadata tabulate \
 	--m-input-file ${DATADIR}/dada2_stats.qza  \
 	--o-visualization ${DATADIR}/dada2_stats.qzv
@@ -68,16 +73,15 @@ qiime feature-table summarize \
 	--o-visualization ${DATADIR}/dada2_table.qzv
 #
 # Generating a phylogenetic tree for diversity analysis
-wget \
-  -O "sepp-refs-gg-13-8.qza" \
-  "https://data.qiime2.org/2022.2/common/sepp-refs-gg-13-8.qza"
+wget -O "$DATADIR/sepp-refs-gg-13-8.qza" \
+	"https://data.qiime2.org/2022.2/common/sepp-refs-gg-13-8.qza"
 #
 qiime fragment-insertion sepp \
 	--i-representative-sequences ${DATADIR}/dada2_rep_set.qza \
-	--i-reference-database sepp-refs-gg-13-8.qza \
+	--i-reference-database ${DATADIR}/sepp-refs-gg-13-8.qza \
 	--o-tree ${DATADIR}/tree.qza \
 	--o-placements ${DATADIR}/tree_placements.qza \
-	--p-threads 1  # update to a higher number if you can
+	--p-threads 4
 #
 # Alpha Rarefaction and Selecting a Rarefaction Depth
 qiime diversity alpha-rarefaction \
@@ -114,47 +118,48 @@ qiime longitudinal anova \
 #
 # Beta diversity
 qiime diversity beta-group-significance \
-	--i-distance-matrix core-metrics-results/unweighted_unifrac_distance_matrix.qza \
-	--m-metadata-file metadata.tsv \
+	--i-distance-matrix $DATADIR/core-metrics-results/unweighted_unifrac_distance_matrix.qza \
+	--m-metadata-file $DATADIR/metadata.tsv \
 	--m-metadata-column donor \
-	--o-visualization core-metrics-results/unweighted-unifrac-donor-significance.qzv
+	--o-visualization $DATADIR/core-metrics-results/unweighted-unifrac-donor-significance.qzv
 #
 qiime diversity beta-group-significance \
-	--i-distance-matrix core-metrics-results/weighted_unifrac_distance_matrix.qza \
-	--m-metadata-file metadata.tsv \
+	--i-distance-matrix $DATADIR/core-metrics-results/weighted_unifrac_distance_matrix.qza \
+	--m-metadata-file $DATADIR/metadata.tsv \
 	--m-metadata-column donor \
-	--o-visualization core-metrics-results/weighted-unifrac-donor-significance.qzv
+	--o-visualization $DATADIR/core-metrics-results/weighted-unifrac-donor-significance.qzv
 #
 qiime diversity beta-group-significance \
-	--i-distance-matrix core-metrics-results/unweighted_unifrac_distance_matrix.qza \
-	--m-metadata-file metadata.tsv \
+	--i-distance-matrix $DATADIR/core-metrics-results/unweighted_unifrac_distance_matrix.qza \
+	--m-metadata-file $DATADIR/metadata.tsv \
 	--m-metadata-column cage_id \
-	--o-visualization core-metrics-results/unweighted-unifrac-cage-significance.qzv \
+	--o-visualization $DATADIR/core-metrics-results/unweighted-unifrac-cage-significance.qzv \
 	--p-pairwise
 #
 qiime diversity beta-group-significance \
-	--i-distance-matrix core-metrics-results/weighted_unifrac_distance_matrix.qza \
-	--m-metadata-file metadata.tsv \
+	--i-distance-matrix $DATADIR/core-metrics-results/weighted_unifrac_distance_matrix.qza \
+	--m-metadata-file $DATADIR/metadata.tsv \
 	--m-metadata-column cage_id \
-	--o-visualization core-metrics-results/weighted-unifrac-cage-significance.qzv \
+	--o-visualization $DATADIR/core-metrics-results/weighted-unifrac-cage-significance.qzv \
 	--p-pairwise
 #
 qiime diversity beta-group-significance \
-	--i-distance-matrix core-metrics-results/weighted_unifrac_distance_matrix.qza \
-	--m-metadata-file metadata.tsv \
+	--i-distance-matrix $DATADIR/core-metrics-results/weighted_unifrac_distance_matrix.qza \
+	--m-metadata-file $DATADIR/metadata.tsv \
 	--m-metadata-column cage_id \
-	--o-visualization core-metrics-results/weighted-unifrac-cage-significance_disp.qzv \
+	--o-visualization $DATADIR/core-metrics-results/weighted-unifrac-cage-significance_disp.qzv \
 	--p-method permdisp
+#
 qiime diversity adonis \
-	--i-distance-matrix core-metrics-results/unweighted_unifrac_distance_matrix.qza \
-	--m-metadata-file metadata.tsv \
-	--o-visualization core-metrics-results/unweighted_adonis.qzv \
+	--i-distance-matrix $DATADIR/core-metrics-results/unweighted_unifrac_distance_matrix.qza \
+	--m-metadata-file $DATADIR/metadata.tsv \
+	--o-visualization $DATADIR/core-metrics-results/unweighted_adonis.qzv \
 	--p-formula genotype+donor
 #
 # Taxonomic classification
-wget \
-  -O "gg-13-8-99-515-806-nb-classifier.qza" \
-  "https://data.qiime2.org/2022.2/common/gg-13-8-99-515-806-nb-classifier.qza"
+wget -O "$DATADIR/gg-13-8-99-515-806-nb-classifier.qza" \
+	"https://data.qiime2.org/2022.2/common/gg-13-8-99-515-806-nb-classifier.qza"
+#
 qiime feature-classifier classify-sklearn \
 	--i-reads ${DATADIR}/dada2_rep_set.qza \
 	--i-classifier ${DATADIR}/gg-13-8-99-515-806-nb-classifier.qza \
@@ -202,21 +207,19 @@ qiime composition ancom \
 	--m-metadata-column genotype \
 	--o-visualization ${DATADIR}/ancom_genotype.qzv
 # Taxonomic classification again
-wget \
-  -O "ref_seqs_v4.qza" \
-  "https://data.qiime2.org/2022.2/tutorials/pd-mice/ref_seqs_v4.qza"
+wget -O "$DATADIR/ref_seqs_v4.qza" \
+	"https://data.qiime2.org/2022.2/tutorials/pd-mice/ref_seqs_v4.qza"
+wget -O "$DATADIR/ref_tax.qza" \
+	"https://data.qiime2.org/2022.2/tutorials/pd-mice/ref_tax.qza"
+wget -O "$DATADIR/animal_distal_gut.qza" \
+	"https://data.qiime2.org/2022.2/tutorials/pd-mice/animal_distal_gut.qza"
 #
-wget \
-  -O "ref_tax.qza" \
-  "https://data.qiime2.org/2022.2/tutorials/pd-mice/ref_tax.qza"
-wget \
-  -O "animal_distal_gut.qza" \
-  "https://data.qiime2.org/2022.2/tutorials/pd-mice/animal_distal_gut.qza"
 qiime feature-classifier fit-classifier-naive-bayes \
 	--i-reference-reads ${DATADIR}/ref_seqs_v4.qza \
 	--i-reference-taxonomy ${DATADIR}/ref_tax.qza \
 	--i-class-weight ${DATADIR}/animal_distal_gut.qza \
 	--o-classifier ${DATADIR}/bespoke.qza
+#
 qiime feature-classifier classify-sklearn \
 	--i-reads ${DATADIR}/dada2_rep_set.qza \
 	--i-classifier ${DATADIR}/bespoke.qza \
@@ -225,6 +228,7 @@ qiime feature-classifier classify-sklearn \
 qiime metadata tabulate \
 	--m-input-file ${DATADIR}/bespoke_taxonomy.qza \
 	--o-visualization ${DATADIR}/bespoke_taxonomy.qzv
+#
 qiime taxa collapse \
 	--i-table ${DATADIR}/table_2k.qza \
 	--i-taxonomy ${DATADIR}/taxonomy.qza \
@@ -246,6 +250,7 @@ qiime composition ancom \
 	--m-metadata-file ${DATADIR}/metadata.tsv \
 	--m-metadata-column donor \
 	--o-visualization ${DATADIR}/ancom_donor_uniform.qzv
+#
 qiime taxa collapse \
 	--i-table ${DATADIR}/table_2k.qza \
 	--i-taxonomy ${DATADIR}/bespoke_taxonomy.qza \
@@ -324,4 +329,6 @@ qiime sample-classifier heatmap \
 	--o-filtered-table ${DATADIR}/sample-classifier-results/filtered-table_100-features.qza
 ###
 conda deactivate
+#
+printf "Elapsed: %ds\n" "$[$(date +%s) - $T0]"
 #
